@@ -1,4 +1,4 @@
-from ComplaintsAnalysis.sentiment_classifier import generate_sentiment_metric
+from ComplaintsAnalysis.SentimentMetricGenerator import generate_sentiment_metric
 
 import pandas as pd
 import numpy as np

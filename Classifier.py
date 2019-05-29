@@ -6,7 +6,12 @@ from sklearn.metrics import f1_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils import shuffle
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
 import pickle
 
 pd.set_option('display.max_rows', 100)
@@ -17,14 +22,27 @@ pd.set_option('display.width', 1000)
 def load_data(csv_file):
     """Load the feature and label csv file"""
     df = pd.read_csv(csv_file)
+    df = df[["Complaint ID", "Timely response?", "Product", "corpus_score_sum", "word_num", "sentence_num", "negative_ratio", "most_negative_score", "company_response", "dispute"]]
 
+    df = shuffle(df)
     return df
 
+
+def under_sampling(df, sample_ratio):
+    dispute_yes = df[df["dispute"] == 1]
+    dispute_no = df[df["dispute"] == 0]
+
+    chosed_no = dispute_no.sample(frac=sample_ratio, random_state=0)
+
+
+def check_distribution(X_train, y_train, X_test, y_test):
+    """"""
 
 def prepare_data(df):
     """Generate training and test data. one hot coding for categorical columns. Scale
     real value columns using MinMaxScaler. """
     X = df.loc[:, "corpus_score_sum":"company_response"]
+    #X = df.loc[:, "Product":"company_response"]
     y = df["dispute"]
 
     old_column_num = len(X.columns)
@@ -50,6 +68,13 @@ def prepare_data(df):
     X_test.loc[:, ["word_num", "sentence_num"]] = scaler.transform(X_test.loc[:, ["word_num", "sentence_num"]])
     print(X_test.head())
 
+    # use SMOTE to oversampling X, y
+    x_columns_name = X.columns
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_resample(X_train, y_train)
+    X_train = pd.DataFrame(X_res, columns=x_columns_name)
+    y_train = y_res.ravel()
+
     # Save the new column names to a file
     column_name_file = "result/column_names.csv"
     with open(column_name_file, "w") as fobj:
@@ -66,11 +91,15 @@ def model_evaluate(model, X_train, y_train, X_test, y_test):
     confusion = confusion_matrix(y_test, pred_model)
     print("Confusion matrix:\n{}".format(confusion))
     print("f1 score: {:.2f}".format(f1_score(y_test, pred_model)))
+    fpr, tpr, thresholds = roc_curve(y_test, model.predict_proba(X_test)[:,1])
+    plt.plot(fpr, tpr, label="ROC Curve")
+    plt.savefig("figs/roc.png")
+    auc_score = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
 
 
 def best_logistic_model(X_train, y_train):
     param_grid = {'C': [0.01, 0.1, 1, 10]}
-    grid = GridSearchCV(LogisticRegression(solver="lbfgs", max_iter = 2000), param_grid, cv=5)
+    grid = GridSearchCV(LogisticRegression(solver="lbfgs", max_iter=2000), param_grid, cv=5)
     grid.fit(X_train, y_train)
     print(grid.best_params_)
     # print("Best C parameter: {:.2f}".format(grid.best_params_))
@@ -80,16 +109,18 @@ def best_logistic_model(X_train, y_train):
 
 
 def train_model():
-    feature_file = "data/complaints.sentiment_data.csv"
+    #feature_file = "data/complaints.sentiment_data.csv"
+    feature_file = "data/complaints_with_sentiment_metric.csv"
     df = load_data(feature_file)
     X_train, X_test, y_train, y_test = prepare_data(df)
+
 
     """
     print("Logistic model result")
     lgreg = best_logistic_model(X_train, y_train)
     model_evaluate(lgreg, X_train, y_train, X_test, y_test)
+"""
 
-    """
     print("Random Forest result")
     forest = RandomForestClassifier(n_estimators=100, random_state=0)
     forest.fit(X_train, y_train)
@@ -103,7 +134,7 @@ def train_model():
     """
     # Save the model to file
     file_name = "result/finalized_model.sav"
-    # pickle.dump(lgreg, open(file_name, 'wb'))
+    #pickle.dump(lgreg, open(file_name, 'wb'))
     pickle.dump(forest, open(file_name, 'wb'))
 
     return

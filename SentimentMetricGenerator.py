@@ -95,9 +95,9 @@ def form_feature_data(complaints):
     return X
 
 
-
 def dump_feature_to_csv(data, output_file):
     data.to_csv(output_file, index=False)
+
 
 
 def main():
@@ -107,8 +107,6 @@ def main():
 
     output_file = "data/complaints.sentiment_data.csv"
     #dump_feature_to_csv(X, output_file)
-
-
 
 
 
