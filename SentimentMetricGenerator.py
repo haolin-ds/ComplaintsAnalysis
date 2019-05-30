@@ -12,11 +12,38 @@ pd.set_option('display.width', 1000)
 
 def load_complaints_data(complaints_file):
     complaints = pd.read_csv(complaints_file)
-    print("There are {} complaints with narrative ".format(len(complaints)))
     #Discard those data contains no label
     complaints = complaints.dropna(subset=["Consumer disputed?"])
+    print("There are {} complaints with narrative and label.".format(len(complaints)))
 
     return complaints
+
+
+def num_of_question_mark(narrative):
+    num_of_questionmark = 0
+    for x in narrative:
+        if x == '?':
+            num_of_questionmark += 1
+    return num_of_questionmark
+
+
+def num_of_exclaimation_mark(narrative):
+    num_of_exclaimationmark = 0
+    for x in narrative:
+        if x == '?' or x == '!':
+            num_of_exclaimationmark += 1
+    return num_of_exclaimationmark
+
+def num_of_uppercase_word(narrative):
+    words = narrative.split(" ")
+    num_uppercase_word = 0
+    for word in words:
+        if word == "XXXX" or word == "XXXX," or word == "XXXX.":
+            continue
+        elif len(word) > 2 and word.isupper():
+            print(word)
+            num_uppercase_word += 1
+    return num_uppercase_word
 
 
 def transfer_label_column(label_column):
@@ -36,6 +63,10 @@ def generate_sentiment_metric(complaints):
     corpus_score_sum_list = []
     negative_ratio_list = []  # The ratio of sentences with negative score in the corpus
     most_negative_score_list = []
+    num_of_question_mark_list = []
+    num_of_exclaimation_mark_list = []
+
+    #num_of_uppercase_word_list = []
 
     """Initialize Vader sentiment analyzer"""
     analyser = SentimentIntensityAnalyzer()
@@ -73,14 +104,24 @@ def generate_sentiment_metric(complaints):
         corpus_score_sum_list.append(copus_score_sum)
         negative_ratio_list.append(negative_num / (len(sentence_score_list)))
         most_negative_score_list.append(most_negative_score)
+        num_of_question_mark_list.append(num_of_question_mark(narrative))
+        num_of_exclaimation_mark_list.append(num_of_exclaimation_mark(narrative))
+
+        #num_of_uppercase_word_list.append(num_of_uppercase_word(narrative))
 
     # Will not use the list as feature
     # X["sentiment_score"] = corpus_score_list
+    #X["Complaint ID"] = complaints["Complaint ID"]
     X["corpus_score_sum"] = corpus_score_sum_list
-    X["word_num"] = word_num_list
-    X["sentence_num"] = sentence_num_list
+    X["corpus_score_ave"] = X["corpus_score_sum"] / sentence_num_list
     X["negative_ratio"] = negative_ratio_list
     X["most_negative_score"] = most_negative_score_list
+    X["word_num"] = word_num_list
+    X["sentence_num"] = sentence_num_list
+    X["num_of_question_mark"] = num_of_question_mark_list
+    X["num_of_exclaimation_mark"] = num_of_exclaimation_mark_list
+    #X["num_of_uppercase_word"] = num_of_uppercase_word_list
+
     return X
 
 def form_feature_data(complaints):
@@ -99,16 +140,16 @@ def dump_feature_to_csv(data, output_file):
     data.to_csv(output_file, index=False)
 
 
-
 def main():
     complaints_file = "data/complaints-2019-05-16_13_17.csv"
     complaints = load_complaints_data(complaints_file)
+
     X = form_feature_data(complaints)
 
     output_file = "data/complaints.sentiment_data.csv"
     #dump_feature_to_csv(X, output_file)
 
 
-
+main()
 #print(X.head())
 

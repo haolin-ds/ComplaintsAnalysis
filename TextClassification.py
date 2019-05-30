@@ -4,7 +4,7 @@ from nltk.corpus import stopwords
 #from spacy.lang.en import stop_words
 from sklearn.decomposition import LatentDirichletAllocation
 import numpy as np
-from ComplaintsAnalysis.SentimentMetricGenerator import load_complaints_data
+
 
 def merge_stop_words():
     print(len(stopwords))
@@ -34,11 +34,15 @@ def concatenate_text(complaints_narrative):
     text_train = "\n".join(complaints_narrative)
     return text_train
 
-complaints = load_complaints_data("data/complaints-2019-05-16_13_17.csv")
-complaints_narrative = complaints["Consumer complaint narrative"]
-text_train = concatenate_text(complaints_narrative[0:1000])
-#LDA(text_train)
-LDA(complaints_narrative)
+def main():
+    """
+    #LDA
+    text_train = concatenate_text(complaints_narrative[0:1000])
+    #LDA(text_train)
+    LDA(complaints_narrative)
+
+"""
+
 
 
 
