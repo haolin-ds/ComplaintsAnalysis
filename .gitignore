@@ -1,7 +1,13 @@
 # data files
 **/data
 
+.DS_Store
+
 **/.ipynb_checkpoints
 **/__pycache__
 **/result
 **/figs
+**/.idea
+
+.idea/ComplaintsAnalysis.iml
+.idea/misc.iml
