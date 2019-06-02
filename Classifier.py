@@ -35,8 +35,7 @@ def under_sampling(df, sample_ratio):
     chosed_no = dispute_no.sample(frac=sample_ratio, random_state=0)
 
 
-def check_distribution(X_train, y_train, X_test, y_test):
-    """"""
+
 
 def prepare_data(df):
     """Generate training and test data. one hot coding for categorical columns. Scale

@@ -54,9 +54,16 @@ def transfer_label_column(label_column):
     return label_column
 
 
-def generate_sentiment_metric(complaints):
-    """Generate features from narrative sentiment characteristics, say sentiment of the copus,
-        the sentence number of the corpus, word number"""
+def generate_sentiment_metric(narratives):
+    """
+    Generate sentiment metrics for each narrativerom narrative sentiment characteristics, say sentiment of the copus,
+        the sentence number of the corpus, word number
+    :param narratives: a pandas column containing complaints narratives
+    :return: a dataframe whose columns are several sentiment metrics
+    [corpus_score_sum, corpus_score_ave, negative_ratio, most_negative_score,
+    word_num, sentence_num, num_of_question_mark, num_of_exclaimation_mark]
+    """
+
     corpus_score_list = []
     word_num_list = []
     sentence_num_list = []
@@ -75,7 +82,7 @@ def generate_sentiment_metric(complaints):
     X = pd.DataFrame()
 
     i = 0
-    for narrative in complaints["Consumer complaint narrative"]:
+    for narrative in narratives:
         i += 1
         if i % 1000 == 0:
             print(i)
@@ -111,7 +118,7 @@ def generate_sentiment_metric(complaints):
 
     # Will not use the list as feature
     # X["sentiment_score"] = corpus_score_list
-    #X["Complaint ID"] = complaints["Complaint ID"]
+
     X["corpus_score_sum"] = corpus_score_sum_list
     X["corpus_score_ave"] = X["corpus_score_sum"] / sentence_num_list
     X["negative_ratio"] = negative_ratio_list
@@ -124,14 +131,26 @@ def generate_sentiment_metric(complaints):
 
     return X
 
-def form_feature_data(complaints):
-    X = generate_sentiment_metric(complaints)
 
-    #Add company response in
+def form_feature_data(complaints):
+    """
+    Combine some complaint information in the data
+    :param complaints: complaints data frame
+    :return: a dataframe containing sentiment metrics and [company_response, dispute, Complaint ID]
+    """
+
+    narratives = complaints["Consumer complaint narrative"]
+
+    X = generate_sentiment_metric(narratives)
+
+    # Add company response in
     X["company_response"] = complaints["Company response to consumer"].reset_index(drop=True)
 
-    #Add the label in
+    # Add the label in
     X["dispute"] = transfer_label_column(complaints["Consumer disputed?"]).reset_index(drop=True)
+
+    # Add the complaint ID
+    X["Complaint ID"] = complaints["Complaint ID"].reset_index(drop=True)
 
     return X
 
@@ -146,10 +165,10 @@ def main():
 
     X = form_feature_data(complaints)
 
-    output_file = "data/complaints.sentiment_data.csv"
-    #dump_feature_to_csv(X, output_file)
+    output_file = "data/complaints.sentiment_metric.csv"
+    dump_feature_to_csv(X, output_file)
 
 
-main()
-#print(X.head())
+#main()
+
 

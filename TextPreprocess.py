@@ -1,14 +1,20 @@
-from nltk.tokenize import sent_tokenize, word_tokenize
-from gensim.models import Word2Vec
 import re
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
 # from spacy.lang.en.stop_words import STOP_WORDS
 import nltk
+import pandas as pd
+import scipy
+import pickle
 
 
 def merge_stop_word():
-    """Merge stop words from three library"""
+    """
+    Merge stop words from two libraries and customized words.
+    :return: a list of stop_words
+    """
+
     all_stopwords = set(stopwords.words('english'))
     # all_stopwords.add(STOP_WORDS)
     for word in ENGLISH_STOP_WORDS:
@@ -27,10 +33,11 @@ def merge_stop_word():
 
 def convert_pos_tag(tag):
     """
-    Input: Parts-of-speech tag in Penn TreeBank format.
-    Function: convert the first letter of Penn pos-tag to a form NLTK can use
-    Output: NLTK-compatible pos-tag.
+    convert the first letter of Penn pos-tag to a form NLTK can use
+    :param tag: Parts-of-speech tag in Penn TreeBank format.
+    :return: NLTK-compatible pos-tag.
     """
+
     pos = {'N': 'n', 'V': 'v', 'J': 'a', 'S': 's', 'R': 'r'}
     if tag in pos.keys():
         return pos[tag]
@@ -39,7 +46,12 @@ def convert_pos_tag(tag):
 
 
 def pre_process_narrative(narrative):
-    # subtitute digits in the narrative into digits. There are not useful for text classification
+    """
+    Tokenize, lemmetize, remove stop_words from a complaint narrative
+    :param narrative: one complaint narrative
+    :return: a list of pre-processed tokens
+    """
+    # substitute digits in the narrative into digits. There are not useful for text classification
     narrative = re.sub(r"\d+", "DIGITS", narrative)
 
     # Prepare stop-words list
@@ -53,29 +65,117 @@ def pre_process_narrative(narrative):
     lmtzr = nltk.WordNetLemmatizer()
     tokens_lemmarized = [lmtzr.lemmatize(x[0], convert_pos_tag(x[1])) for x in tokens_pos]
 
+    min_word_len_thresh = 2
     # Remove stop-words
     tokens_lemmarized_nostop = [token for token in tokens_lemmarized if
-                                (len(token) > 2) and (token not in all_stopwords)]
+                                (len(token) > min_word_len_thresh) and (token not in all_stopwords)]
 
-    print(tokens_lemmarized_nostop)
+    return tokens_lemmarized_nostop
 
 
+# TODO seems no use
 def pre_process(complaints):
+    """
+    Pre-process each narrative in complaints dataframe.
+    :param complaints: a dataframe containing a column of narratives
+    :return: complaints with a new column "processed narrative" storing a list of tokens
+    """
     narratives = complaints["Consumer complaint narrative"]
-    cleaned_narratives = []
+    processed_narratives = []
 
+    i = 0
     for narrative in narratives:
+        if i % 1000 == 0:
+            print("Pre processing the {}th complaint narrative!".format(i))
+
         # Remove digits in the narrative. There are not useful for text classification
         narrative = re.sub(r"\d+", "", narrative)
+
         # Remove XXXX which is substitute by US govenment to protect privacy
         narrative = re.sub(r"XXXX", "", narrative)
-        cleaned_narratives.append(narrative)
 
-        pre_process_narrative(narrative)
+        # Pre-process each narrative
+        processed_narratives.append(pre_process_narrative(narrative))
+        i += 1
 
-    print(narratives.shape)
-    print(len(cleaned_narratives))
-
-    # complaints["cleaned_narrative"] = cleaned_narratives
+    complaints["processed_narrative"] = processed_narratives
 
 
+def export_processed_narratives(complaints_narrative, output_file):
+    """
+    Export complaints with processed_narrative in a file "data/narrative_preprocessed.csv" file with four columns
+    [Complaint ID,Consumer complaint narrative,Consumer disputed?,processed_narrative]
+    """
+    complaints_narrative.to_csv(output_file)
+
+
+def tf_idf_vectorize(pre_processed_narratives, min_df=5):
+    """
+    Build tf-idf-vectorizer model using narratives
+    :param pre_processed_narratives: tokened narratives in dataframe columns
+    :param suffix:  all, product_name
+    :return: model, and vectorized narratives
+    """
+    max_feature_num = 10000
+    tf_idf_vectorizer = TfidfVectorizer(min_df=min_df,
+                                        ngram_range=(1, 3),
+                                        max_features=max_feature_num)
+
+    narratives_vectorized = tf_idf_vectorizer.fit_transform(pre_processed_narratives)
+
+    return tf_idf_vectorizer, narratives_vectorized, max_feature_num
+
+
+def dump_tf_idf_model(tf_idf_vectorizer, max_feature_num, save_dir, tag):
+    # dump tf-idf vectorizer to file
+    pickle.dump(tf_idf_vectorizer,
+                open(save_dir + "/tfidf_vectorizer_max{}.{}.pickle".format(max_feature_num, tag), "wb"))
+
+    # No need to dump the vertorized narrative_vectors to file
+    #pickle.dump(narratives_vectorized, open(save_dir + "/narratives_vectorized_tf-idf_max{}.{}.pickle".format(max_feature_num, suffix), "wb"))
+
+
+def get_tf_idf_vector(tf_idf_vectorizer, narrative):
+    """
+    Given a new narrative, pre-process it and vectorize it using
+    pretrained tf_idf_vectorizer
+    :param tf_idf_vectorizer: pre-trained tf-idf vectorizer
+    :param narrative:
+    :return: narrative_vectorized
+    """
+
+    pre_processed_narrative = pre_process_narrative(narrative)
+    return tf_idf_vectorizer.transform(pre_processed_narrative)
+
+
+def generate_tf_idf_model(processed_narratives):
+    save_dir = "trained_models"
+    tfidf, max_feature_num = tf_idf_vectorize(processed_narratives)
+    dump_tf_idf_model(tfidf, max_feature_num, save_dir)
+
+
+def text_preprocess():
+    # Load in complaints and keep only those contain Labels
+    complaints = pd.read_csv("data/complaints-2019-05-16_13_17.csv")
+    complaints = complaints.dropna(subset=["Consumer disputed?"])
+    complaints_narrative = complaints.loc[:, ["Complaint ID", "Consumer complaint narrative", "Consumer disputed?"]]
+
+    # Load in complaint file and generate a new file containing preprocessed narratives
+    # pre_process(complaints_narrative)
+    output_file = "data/narrative_preprocessed.csv"
+    # export_processed_narratives(complaints_narrative, output_file)
+
+
+def run_tf_idf():
+    # text_preprocess()
+
+    print("Loading complaints with processed narrative...")
+    complaints_narrative = pd.read_csv("data/narrative_preprocessed.csv")
+    # run tf-idf on all complaints and dump them
+    processed_narratives = complaints_narrative["processed_narrative"]
+    print("Vectorizing use tf-idf...")
+    generate_tf_idf_model(processed_narratives)
+    print("Done!")
+
+
+#run_tf_idf()
