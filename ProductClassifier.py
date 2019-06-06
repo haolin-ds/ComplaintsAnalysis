@@ -1,6 +1,5 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import pickle
+from joblib import dump, load
 
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import train_test_split
@@ -8,8 +7,9 @@ from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.linear_model import LogisticRegression
 from SMOTEOverSampling import smote_over_sampling
+from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
 
-from Utilities import save_model
+from Utilities import save_model, draw_roc_curve, VALIDATION_SIZE
 
 PRODUCT_LABELS = ['Bank account or service',
                   'Credit reporting',
@@ -21,45 +21,45 @@ PRODUCT_LABELS = ['Bank account or service',
                   'Consumer Loan',
                   'Money transfers',
                   'Prepaid card',
-                  'Other financial service',
-                  'Virtual currency']
+                  'Other financial service']
 
 
-def load_tf_idf_vecterizer(model_pickle_file):
+def load_tf_idf_vecterizer(model_joblib_file):
     """
     Load pre-trained tf-idf vectorizer
-    :param vectors_pickle_file:
+    :param vectors_joblib_file:
     :return:
     """
-    with open(model_pickle_file, "rb") as f:
-        tf_idf_vectorizer = pickle.load(f)
+    with open(model_joblib_file, "rb") as f:
+        tf_idf_vectorizer = load(f)
 
     return tf_idf_vectorizer
 
 
-def load_narratives_vectors(vectors_pickle_file):
+def load_narratives_vectors(vectors_joblib_file):
     """
     Load vectorized narratives
-    :param vectors_pickle_file:
+    :param vectors_joblib_file:
     :return:
     """
-    with open(vectors_pickle_file, 'rb') as f:
-        narratives_vectorized = pickle.load(f)
+    with open(vectors_joblib_file, 'rb') as f:
+        narratives_vectorized = load(f)
 
     return narratives_vectorized
 
 
-def feature_engineering(vectors_pickle_file):
-    complaints = pd.read_csv("data/complaints-2019-05-16_13_17.csv")
+def feature_engineering():
+    complaints = pd.read_csv("data/complaints-2019-05-16_13_17.clean.csv")
     narrative_processed = pd.read_csv("data/narrative_preprocessed.csv")
     data = pd.merge(complaints[["Complaint ID", "Product"]],
                     narrative_processed[["Complaint ID", "Consumer disputed?", "processed_narrative"]], how='inner',
                     on=['Complaint ID', 'Complaint ID'])
-
+    # Only use non_validation data
+    data = data[VALIDATION_SIZE:]
     n_classes = len(PRODUCT_LABELS)
     print("Number of Product categories:", n_classes)
 
-    X = load_narratives_vectors(vectors_pickle_file)
+    X = data["processed_narrative"]
     y = label_binarize(data["Product"], classes=PRODUCT_LABELS)
     print(X.shape)
     print(y.shape)
@@ -68,17 +68,40 @@ def feature_engineering(vectors_pickle_file):
 
 
 def multi_classifier(X, y, classifier, product_labels_name, use_SMOTE):
+    """
+    Based on vectorized narrative X, and labels in y, build a multi-classifier
+    to assign product type for complaints
+    :param X: processed narratives
+    :param y: product label
+    :param classifier: the classifier to be used
+    :param product_labels_name: the product label names
+    :param use_SMOTE: whether to use SMOTE or not
+    :return: the classifier and the roc curve is drawn
+    """
     X_trainval, X_test, y_trainval, y_test = train_test_split(X, y, random_state=0)
 
-    multi_class_classifier = OneVsRestClassifier(classifier)
-    if use_SMOTE:
-        X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval, y_trainval)
-        y_score = multi_class_classifier.fit(X_trainval_res, y_trainval_res).decision_function(X_test)
-    else:
-        y_score = multi_class_classifier.fit(X_trainval, y_trainval).decision_function(X_test)
+    print("tf-idf vectorizing...")
+    tf_idf_vectorizer, X_trainval_vectorized, \
+        max_feature_num = tf_idf_vectorize(X_trainval)
+    X_test_vectorized = tf_idf_vectorizer.transform(X_test)
 
-    n_classes = len(product_labels_name)
+    print("Saving Tf-idf model")
+    save_dir = "trained_models"
+    tag = "product_classifier"
+    dump_tf_idf_model(tf_idf_vectorizer, max_feature_num, save_dir, tag)
+
+    multi_class_classifier = OneVsRestClassifier(classifier)
+
+    print("Fit the model...")
+    if use_SMOTE:
+        X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval_vectorized, y_trainval)
+        y_score = multi_class_classifier.fit(X_trainval_res, y_trainval_res).decision_function(X_test_vectorized)
+    else:
+        y_score = multi_class_classifier.fit(X_trainval_vectorized, y_trainval).decision_function(X_test_vectorized)
+
+    print("Draw the Roc curve...")
     # Compute ROC curve and ROC area for each class
+    n_classes = len(product_labels_name)
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
@@ -92,44 +115,16 @@ def multi_classifier(X, y, classifier, product_labels_name, use_SMOTE):
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
     print("average AUC score: ", roc_auc["micro"])
 
-    draw_roc_curve(fpr, tpr, roc_auc, product_labels_name)
+    title = "ROC Curve of multi-class classification of different Product categories"
+    save_file = "figs/ROC_Curve_Product.png"
+    draw_micro = True
+    draw_roc_curve(title, save_file, fpr, tpr, roc_auc, product_labels_name, True)
 
     return multi_class_classifier
 
 
-def draw_roc_curve(fpr, tpr, roc_auc, product_labels_name):
-    # Plot all ROC curves
-    plt.figure(figsize=(9, 8))
-
-    n_classes = len(product_labels_name)
-
-    prop_cycle = plt.rcParams['axes.prop_cycle']
-    colors = prop_cycle.by_key()['color']
-    lw = 2 # line width
-
-    for i, color in zip(range(n_classes), colors):
-        plt.plot(fpr[i], tpr[i], color=color, lw = lw,
-                 label='{0} (area = {1:0.2f})'
-                       ''.format(product_labels_name[i], roc_auc[i]))
-
-    plt.plot(fpr["micro"], tpr["micro"],
-             label='micro-average ROC curve (area = {0:0.2f})'
-                   ''.format(roc_auc["micro"]),
-             color='deeppink', linestyle=':', linewidth=4)
-
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve of multi-class classification of different Product categories')
-    plt.legend(loc="lower right")
-    #plt.show()
-    plt.savefig("figs/ROC_Curve_Product.png")
-
-
 def main():
-    vectors_pickle_file = "trained_models/narratives_vectorized_tf-idf_max10000.all.pickle"
-    X, y = feature_engineering(vectors_pickle_file)
+    X, y = feature_engineering()
 
     classifier = LogisticRegression(C=1, solver="lbfgs",
                                     max_iter=2000,
@@ -141,4 +136,4 @@ def main():
     model_export_file = "trained_models/product_classifier_lgreg.sav"
     save_model(product_classifier, model_export_file)
 
-#main()
+main()

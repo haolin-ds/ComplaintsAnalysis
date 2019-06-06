@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
-import pickle
-import matplotlib.pyplot as plt
+from joblib import dump
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score, roc_curve
@@ -11,7 +10,7 @@ from scipy.sparse import hstack
 
 from SMOTEOverSampling import smote_over_sampling
 from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
-from Utilities import scale_features
+from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
 
 def merge_narrative_processed_and_sentiment_metrics(narrative_preprocessed_file, complaints_with_sentiment):
@@ -61,14 +60,9 @@ def model_evaluate(model, X_test, y_test, is_rf=False, tag="all"):
         # plot the roc curve
         fpr, tpr, thresholds = roc_curve(y_test, model.decision_function(X_test))
 
-    plt.plot(fpr, tpr, label='ROC curve of {} (AUC = {:,.2f})'.format(tag, model_auc))
-
-    # Add the chance line
-    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='black',
-             label='Chance', alpha=.8)
-    #plt.savefig(roc_fig)
-
     print("AUC for model is: {:.3f}".format(model_auc))
+
+    return fpr, tpr, model_auc
 
 
 def feature_engineer(X_train, X_test, tag="all"):
@@ -80,12 +74,13 @@ def feature_engineer(X_train, X_test, tag="all"):
     :param tag: The tag as suffix to save the tf-idf vectorizer
     :return: X_train and X_test are tf-idf transformed and merge with sentiment metrics
     """
-    X_train_sentiment_metric = X_train.loc[:, "corpus_score_sum":"company_response_Untimely response"]
+    X_train_sentiment_metric = X_train.loc[:, "corpus_score_sum":"company_response_Closed"]
 
     # print(complaints_features[["processed_narrative"]].shape)
     print("Tf-idf vectorizing...")
+    #print(X_train["processed_narrative"].head())
     tf_idf_vectorizer, X_train_narratives_vectorized, max_feature_num = tf_idf_vectorize(
-        X_train["processed_narrative"], 1)
+        X_train["processed_narrative"])
 
     print("Saving Tf-idf model")
     save_dir = "trained_models"
@@ -94,7 +89,7 @@ def feature_engineer(X_train, X_test, tag="all"):
     X_train = hstack((X_train_narratives_vectorized, np.array(X_train_sentiment_metric)))
 
     # X_test
-    X_test_sentiment_metric = X_test.loc[:, "corpus_score_sum":"company_response_Untimely response"]
+    X_test_sentiment_metric = X_test.loc[:, "corpus_score_sum":"company_response_Closed"]
     X_test_narratives_vectorized = tf_idf_vectorizer.transform(X_test["processed_narrative"])
     X_test = hstack((X_test_narratives_vectorized, np.array(X_test_sentiment_metric)))
 
@@ -105,20 +100,23 @@ def logistic_regression_model(X_train, X_test, y_train, y_test, tag, save_dir):
     lgreg = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
     lgreg.fit(X_train, y_train)
     is_rf = False
-    model_evaluate(lgreg, X_test, y_test, is_rf, tag)
+    fpr, tpr, model_auc = model_evaluate(lgreg, X_test, y_test, is_rf, tag)
 
     # save the model
-    pickle.dump(lgreg, open(save_dir + "/lgreg.{}.pickle".format(tag), "wb"))
+    dump(lgreg, open(save_dir + "/lgreg.{}.joblib".format(tag), "wb"))
+
+    return fpr, tpr, model_auc
 
 
 def gradient_boosting_model(X_train, X_test, y_train, y_test, tag, save_dir):
     gbrt = GradientBoostingClassifier(random_state=0)
     gbrt.fit(X_train, y_train)
     is_rf = False
-    model_evaluate(gbrt, X_test, y_test, is_rf, tag)
+    fpr, tpr, model_auc = model_evaluate(gbrt, X_test, y_test, is_rf, tag)
 
     # save the model
-    pickle.dump(gbrt, open(save_dir + "/gbrt.{}.pickle".format(tag), "wb"))
+    dump(gbrt, open(save_dir + "/gbrt.{}.joblib".format(tag), "wb"))
+    return fpr, tpr, model_auc
 
 
 def build_classifier(complaints_features, classifier_model, tag, save_dir):
@@ -135,7 +133,7 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     X = complaints_features
     y = [0 if x == "No" else 1 for x in complaints_features["Consumer disputed?"]]
 
-    X_trainval, X_test, y_trainval, y_test = train_test_split(X, y, random_state=42)
+    X_trainval, X_test, y_trainval, y_test = train_test_split(X, y, random_state=0)
 
     # scale
     X_trainval, X_test = scale_features(X_trainval, X_test)
@@ -146,8 +144,8 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     # Oversampling using SMOTE
     X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval, y_trainval)
 
-    classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
-
+    fpr, tpr, model_auc = classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
+    return fpr, tpr, model_auc
 
 def main():
     # Load the feature and label csv file, join them according to complaint ID
@@ -155,19 +153,32 @@ def main():
     narrative_preprocessed_file = "data/narrative_preprocessed.csv"
     complaints_features = merge_narrative_processed_and_sentiment_metrics(narrative_preprocessed_file,
                                                                           complaints_with_sentiment)
+    print(complaints_features.head())
+    # omit the first validation_size complaints to be validation set
+    complaints_features = complaints_features[VALIDATION_SIZE:]
+
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    classifier_model = logistic_regression_model
-    model_tag = "lgrg"
-    # classifier_model = gradient_boosting_model
-    # model_tag = "gbm"
+    #classifier_model = logistic_regression_model
+    #model_tag = "lgrg"
+    classifier_model = gradient_boosting_model
+    model_tag = "gbm"
 
     # Build a classifier for all category together
     tag = "all"
-    build_classifier(complaints_features, classifier_model, tag, model_save_dir)
+    fpr, tpr, model_auc = build_classifier(complaints_features, classifier_model, tag, model_save_dir)
+    title = "ROC curve for escalate classifier for " + model_tag
+    save_file = "figs/roc_escalation_classifier_" + model_tag + ".png"
+    draw_roc_curve(title, save_file, [fpr], [tpr], [model_auc], [model_tag])
+
 
     # For each product category, build the classifier
+    fpr_list = []
+    tpr_list = []
+    model_auc_list = []
+    tag_list = []
+
     products = list(complaints_features["Product"].unique())
     for product in products:
         print("Building classifier for ", product)
@@ -179,14 +190,15 @@ def main():
         # The tag used as suffix of roc curve and model save
         tag = "_".join(product.split(" "))
 
-        plt.title("ROC curve for escalate classifier for " + tag)
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.legend(loc="lower right")
+        fpr, tpr, model_auc = build_classifier(complaints_features_one_category, classifier_model, tag, model_save_dir)
+        fpr_list.append(fpr)
+        tpr_list.append(tpr)
+        model_auc_list.append(model_auc)
+        tag_list.append(tag)
 
-        build_classifier(complaints_features_one_category, classifier_model, tag, model_save_dir)
+    title = "ROC curve for escalate classifier for each product type"
+    save_file = "figs/roc_escalation_classifier_separate_by_product_" + model_tag + ".png"
+    draw_roc_curve(title, save_file, fpr_list, tpr_list, model_auc_list, tag_list)
 
-        roc_fig = "figs/roc_escalation_classifier_" + model_tag + "_" + tag + ".png"
-        plt.savefig(roc_fig)
 
 #main()

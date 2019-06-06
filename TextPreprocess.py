@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import nltk
 import pandas as pd
 import scipy
-import pickle
+from joblib import dump
 
 
 def merge_stop_word():
@@ -52,7 +52,9 @@ def pre_process_narrative(narrative):
     :return: a list of pre-processed tokens
     """
     # substitute digits in the narrative into digits. There are not useful for text classification
-    narrative = re.sub(r"\d+", "DIGITS", narrative)
+    # narrative = re.sub(r"\d+", "DIGITS", narrative)
+    narrative = re.sub(r"\d+", "", narrative)
+    narrative = re.sub(r"XXXX", "", narrative)
 
     # Prepare stop-words list
     all_stopwords = merge_stop_word()
@@ -93,6 +95,7 @@ def pre_process(complaints):
 
         # Remove XXXX which is substitute by US govenment to protect privacy
         narrative = re.sub(r"XXXX", "", narrative)
+        narrative = re.sub(r"XX", "", narrative)
 
         # Pre-process each narrative
         processed_narratives.append(pre_process_narrative(narrative))
@@ -127,12 +130,11 @@ def tf_idf_vectorize(pre_processed_narratives, min_df=5):
 
 
 def dump_tf_idf_model(tf_idf_vectorizer, max_feature_num, save_dir, tag):
+    save_file = save_dir + "/tfidf_vectorizer_max{}.{}.joblib".format(max_feature_num, tag)
+    print("Saving tf-idf model to file " + save_file)
     # dump tf-idf vectorizer to file
-    pickle.dump(tf_idf_vectorizer,
-                open(save_dir + "/tfidf_vectorizer_max{}.{}.pickle".format(max_feature_num, tag), "wb"))
-
-    # No need to dump the vertorized narrative_vectors to file
-    #pickle.dump(narratives_vectorized, open(save_dir + "/narratives_vectorized_tf-idf_max{}.{}.pickle".format(max_feature_num, suffix), "wb"))
+    dump(tf_idf_vectorizer,
+                open(save_file, "wb"))
 
 
 def get_tf_idf_vector(tf_idf_vectorizer, narrative):
@@ -148,34 +150,34 @@ def get_tf_idf_vector(tf_idf_vectorizer, narrative):
     return tf_idf_vectorizer.transform(pre_processed_narrative)
 
 
-def generate_tf_idf_model(processed_narratives):
+def generate_tf_idf_model(processed_narratives, tag):
     save_dir = "trained_models"
-    tfidf, max_feature_num = tf_idf_vectorize(processed_narratives)
-    dump_tf_idf_model(tfidf, max_feature_num, save_dir)
+    tfidf, narrative_vectorized, max_feature_num = tf_idf_vectorize(processed_narratives)
+    dump_tf_idf_model(tfidf, max_feature_num, save_dir, tag)
 
 
 def text_preprocess():
     # Load in complaints and keep only those contain Labels
-    complaints = pd.read_csv("data/complaints-2019-05-16_13_17.csv")
-    complaints = complaints.dropna(subset=["Consumer disputed?"])
+    complaints = pd.read_csv("data/complaints-2019-05-16_13_17.clean.csv")
     complaints_narrative = complaints.loc[:, ["Complaint ID", "Consumer complaint narrative", "Consumer disputed?"]]
 
     # Load in complaint file and generate a new file containing preprocessed narratives
-    # pre_process(complaints_narrative)
+    pre_process(complaints_narrative)
     output_file = "data/narrative_preprocessed.csv"
-    # export_processed_narratives(complaints_narrative, output_file)
+    export_processed_narratives(complaints_narrative, output_file)
 
 
 def run_tf_idf():
     # text_preprocess()
 
     print("Loading complaints with processed narrative...")
-    complaints_narrative = pd.read_csv("data/narrative_preprocessed.csv")
+    complaints_narrative = pd.read_csv("data/narrative_preprocessed.csv", index=False)
     # run tf-idf on all complaints and dump them
     processed_narratives = complaints_narrative["processed_narrative"]
     print("Vectorizing use tf-idf...")
-    generate_tf_idf_model(processed_narratives)
+    tag = "for_product_classifier"
+    generate_tf_idf_model(processed_narratives, tag)
     print("Done!")
 
 
-#run_tf_idf()
+#text_preprocess()

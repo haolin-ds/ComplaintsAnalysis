@@ -5,7 +5,8 @@
 
 **/.ipynb_checkpoints
 **/__pycache__
-**/result
+**/results
+**/trained_models
 **/figs
 **/.idea
 
