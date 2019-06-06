@@ -12,8 +12,7 @@ pd.set_option('display.width', 1000)
 
 def load_complaints_data(complaints_file):
     complaints = pd.read_csv(complaints_file)
-    #Discard those data contains no label
-    complaints = complaints.dropna(subset=["Consumer disputed?"])
+
     print("There are {} complaints with narrative and label.".format(len(complaints)))
 
     return complaints
@@ -158,15 +157,29 @@ def form_feature_data(complaints):
 def dump_feature_to_csv(data, output_file):
     data.to_csv(output_file, index=False)
 
+def get_complaints_with_sentiment(complaints, sentiment_metrics):
+    complaints_with_sentiment = pd.merge(complaints.reset_index(drop=True),
+                                   sentiment_metrics.reset_index(drop=True),
+                                   how='inner',
+                                   on=['Complaint ID', 'Complaint ID'])
+    return complaints_with_sentiment
 
 def main():
-    complaints_file = "data/complaints-2019-05-16_13_17.csv"
+    complaints_file = "data/complaints-2019-05-16_13_17.clean.csv"
     complaints = load_complaints_data(complaints_file)
+
+    print(complaints["Company response to consumer"].value_counts())
 
     X = form_feature_data(complaints)
 
+    # Save complaint ID and sentiment_metrics
     output_file = "data/complaints.sentiment_metric.csv"
     dump_feature_to_csv(X, output_file)
+
+    # Save complaints together with sentiment metrics
+    complaints_with_sentiment = get_complaints_with_sentiment(complaints, X)
+    output_file = "data/complaints_with_sentiment_metric.csv"
+    dump_feature_to_csv(complaints_with_sentiment, output_file)
 
 
 #main()
