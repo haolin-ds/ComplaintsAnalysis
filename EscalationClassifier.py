@@ -1,14 +1,16 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from imblearn.under_sampling import RandomUnderSampler
 from joblib import dump
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score, roc_curve
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score, roc_curve, auc
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from scipy.sparse import hstack
+from scipy import interp
 
-
-from SMOTEOverSampling import smote_over_sampling
+from SMOTEOverSampling import smote_over_sampling, under_sampling
 from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
 from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
@@ -74,13 +76,17 @@ def feature_engineer(X_train, X_test, tag="all"):
     :param tag: The tag as suffix to save the tf-idf vectorizer
     :return: X_train and X_test are tf-idf transformed and merge with sentiment metrics
     """
-    X_train_sentiment_metric = X_train.loc[:, "corpus_score_sum":"company_response_Closed"]
+    X_train_sentiment_metric = X_train.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
 
+    #print(X_train["processed_narrative"].head())
     # print(complaints_features[["processed_narrative"]].shape)
+
     print("Tf-idf vectorizing...")
     #print(X_train["processed_narrative"].head())
     tf_idf_vectorizer, X_train_narratives_vectorized, max_feature_num = tf_idf_vectorize(
         X_train["processed_narrative"])
+
+    print(X_train_narratives_vectorized.shape)
 
     print("Saving Tf-idf model")
     save_dir = "trained_models"
@@ -89,7 +95,7 @@ def feature_engineer(X_train, X_test, tag="all"):
     X_train = hstack((X_train_narratives_vectorized, np.array(X_train_sentiment_metric)))
 
     # X_test
-    X_test_sentiment_metric = X_test.loc[:, "corpus_score_sum":"company_response_Closed"]
+    X_test_sentiment_metric = X_test.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
     X_test_narratives_vectorized = tf_idf_vectorizer.transform(X_test["processed_narrative"])
     X_test = hstack((X_test_narratives_vectorized, np.array(X_test_sentiment_metric)))
 
@@ -138,6 +144,17 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     # scale
     X_trainval, X_test = scale_features(X_trainval, X_test)
 
+    """
+    # Use undersampling does not work properly
+    column_names = X_trainval.columns
+    X_trainval, y_trainval = under_sampling(X_trainval, y_trainval)
+    tag = "undersampling"
+    
+    X_trainval = pd.DataFrame(X_trainval, columns=column_names)
+    print(X_trainval.shape)
+    print(X_trainval.columns)
+    """
+
     # Feature engineering by vectorizing and generate sentiment metrics
     X_trainval, X_test = feature_engineer(X_trainval, X_test, tag)
 
@@ -145,7 +162,9 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval, y_trainval)
 
     fpr, tpr, model_auc = classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
+
     return fpr, tpr, model_auc
+
 
 def main():
     # Load the feature and label csv file, join them according to complaint ID
@@ -160,10 +179,10 @@ def main():
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    #classifier_model = logistic_regression_model
-    #model_tag = "lgrg"
-    classifier_model = gradient_boosting_model
-    model_tag = "gbm"
+    classifier_model = logistic_regression_model
+    model_tag = "lgrg"
+    #classifier_model = gradient_boosting_model
+    #model_tag = "gbm"
 
     # Build a classifier for all category together
     tag = "all"
@@ -199,6 +218,5 @@ def main():
     title = "ROC curve for escalate classifier for each product type"
     save_file = "figs/roc_escalation_classifier_separate_by_product_" + model_tag + ".png"
     draw_roc_curve(title, save_file, fpr_list, tpr_list, model_auc_list, tag_list)
-
 
 #main()

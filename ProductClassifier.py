@@ -136,4 +136,4 @@ def main():
     model_export_file = "trained_models/product_classifier_lgreg.sav"
     save_model(product_classifier, model_export_file)
 
-main()
+#main()

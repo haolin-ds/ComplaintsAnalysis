@@ -1,5 +1,6 @@
 from joblib import dump, load
 import matplotlib.pyplot as plt
+import re
 from sklearn.preprocessing import MinMaxScaler
 
 VALIDATION_SIZE = 1000
@@ -34,8 +35,13 @@ def get_response_types():
     with open(response_column_names_file, "r") as fobj:
         line = fobj.readline()
         response_types = line.rstrip().split(",")
+        chopped_response_types = []
+        for response in response_types:
+            response = response.split("_")[-1]
+            response = re.sub(r"Closed with ", "", response).capitalize()
+            chopped_response_types.append(response)
 
-    return response_types
+    return chopped_response_types
 
 
 

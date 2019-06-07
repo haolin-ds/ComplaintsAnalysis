@@ -3,14 +3,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from imblearn.under_sampling import RandomUnderSampler
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_curve, auc
 from scipy import interp
 from sklearn.model_selection import StratifiedKFold
 
+from EscalationClassifier import merge_narrative_processed_and_sentiment_metrics, auc_analysis_with_cv
 from SMOTEOverSampling import smote_over_sampling
+from Utilities import VALIDATION_SIZE
 
 
-def auc_analysis_with_cv(classifier, X, y, useSMOTE, under_sampling):
+def auc_analysis_with_cv(classifier, X, y, useSMOTE, use_under_sampling):
     """
     Draw roc curves using cross validation
     :param classifier:
@@ -26,15 +29,22 @@ def auc_analysis_with_cv(classifier, X, y, useSMOTE, under_sampling):
     mean_fpr = np.linspace(0, 1, 100)
 
     i = 0
+    X = np.array(X)
+    y = np.array(y)
     for train, test in cv.split(X, y):
-        X = np.array(X)
-        y = np.array(y)
-
         if useSMOTE == True:
             X_train_res, y_train_res = smote_over_sampling(X[train], y[train])
             probas_ = classifier.fit(X_train_res, y_train_res).predict_proba(X[test])
         elif under_sampling:
-            X_train_under, y_train_under = under_sampling(X[train], y[train], undersample_ratio)
+            X_train_under, y_train_under = under_sampling(X[train], y[train])
+            tmp = X[test]
+
+            # scale
+            #X_train_under, X_test = scale_features(X_train_under, X[test])
+
+            # Feature engineering by vectorizing and generate sentiment metrics
+            X_train_under, X_test = feature_engineer(X_train_under, X[test], "undersampling")
+
             probas_ = classifier.fit(X_train_under, y_train_under).predict_proba(X[test])
         else:
             probas_ = classifier.fit(X[train], y[train]).predict_proba(X[test])
@@ -79,13 +89,14 @@ def auc_analysis_with_cv(classifier, X, y, useSMOTE, under_sampling):
     return mean_auc, std_auc
 
 
-def under_sampling(X_train, y_train, undersample_ratio):
+def under_sampling(X_train, y_train):
     sampler = RandomUnderSampler(sampling_strategy='majority',
                                  random_state=0)
     X_train_under, y_train_under = sampler.fit_sample(X_train, y_train)
     return X_train_under, y_train_under
 
 
+"""
 def choose_best_undersampling_ratio(classifier, X, y):
     ratios = [np.arange(0.2, 1, 0.1)]
     mean_auc_list = []
@@ -94,7 +105,7 @@ def choose_best_undersampling_ratio(classifier, X, y):
     useSMOTE = False
     under_sampling = True
     for ratio in ratios:
-        mean_auc, std_auc = auc_analysis(classifier, X, y, useSMOTE, under_sampling,ratio)
+        mean_auc, std_auc = auc_analysis_with_cv(classifier, X, y, useSMOTE, under_sampling,ratio)
         mean_auc_list.append(mean_auc)
         std_auc_list.append(std_auc)
 
@@ -103,3 +114,26 @@ def choose_best_undersampling_ratio(classifier, X, y):
     print(std_auc_list)
     plt.plot(ratios, mean_auc_list)
     plt.line()
+"""
+
+
+def main():
+    # Load the feature and label csv file, join them according to complaint ID
+    complaints_with_sentiment = "data/complaints_with_sentiment_metric.csv"
+    narrative_preprocessed_file = "data/narrative_preprocessed.csv"
+    complaints_features = merge_narrative_processed_and_sentiment_metrics(narrative_preprocessed_file,
+                                                                          complaints_with_sentiment)
+    print(complaints_features.head())
+    # omit the first validation_size complaints to be validation set
+    complaints_features = complaints_features[VALIDATION_SIZE:]
+
+    X = complaints_features
+    y = [0 if x == "No" else 1 for x in complaints_features["Consumer disputed?"]]
+
+    classifier = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
+
+    useSMOTE = False
+    use_under_sampling = True
+    auc_analysis_with_cv(classifier, X, y, useSMOTE, use_under_sampling)
+
+#main()

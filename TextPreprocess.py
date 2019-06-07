@@ -109,7 +109,7 @@ def export_processed_narratives(complaints_narrative, output_file):
     Export complaints with processed_narrative in a file "data/narrative_preprocessed.csv" file with four columns
     [Complaint ID,Consumer complaint narrative,Consumer disputed?,processed_narrative]
     """
-    complaints_narrative.to_csv(output_file)
+    complaints_narrative.to_csv(output_file, index=False)
 
 
 def tf_idf_vectorize(pre_processed_narratives, min_df=5):
@@ -119,12 +119,13 @@ def tf_idf_vectorize(pre_processed_narratives, min_df=5):
     :param suffix:  all, product_name
     :return: model, and vectorized narratives
     """
-    max_feature_num = 10000
+    max_feature_num = 50000
     tf_idf_vectorizer = TfidfVectorizer(min_df=min_df,
                                         ngram_range=(1, 3),
                                         max_features=max_feature_num)
 
     narratives_vectorized = tf_idf_vectorizer.fit_transform(pre_processed_narratives)
+    print("tf-idf vector shape: {}".format(narratives_vectorized.shape))
 
     return tf_idf_vectorizer, narratives_vectorized, max_feature_num
 
