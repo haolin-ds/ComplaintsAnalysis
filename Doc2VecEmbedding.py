@@ -3,11 +3,15 @@ import numpy as np
 import pandas as pd
 import os
 
+from joblib import dump
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from Utilities import load_model
 from UnderSampling import under_sampling
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
-from EscalationClassifier import logistic_regression_model, model_evaluate
+from EscalationClassifier import model_evaluate
 from SMOTEOverSampling import smote_over_sampling
 from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
@@ -21,7 +25,7 @@ def read_narratives(complaints, tokens_only=False):
         if tokens_only:
             results.append(gensim.utils.simple_preprocess(narrative))
         else:
-            results.append(gensim.models.doc2vec.TaggedDocument(gensim.utils.simple_preprocess(narrative), [complaint_id]))
+            results.append(TaggedDocument(gensim.utils.simple_preprocess(narrative), [complaint_id]))
 
     return results
 
@@ -33,7 +37,7 @@ def dump_doc2vec_model(model, save_dir, tag):
 
 
 def load_doc2vec_model(model_file):
-    model = gensim.Doc2Vec.load(model_file)
+    model = Doc2Vec.load(model_file)
     return model
 
 
@@ -72,7 +76,7 @@ def combine_features(X_vectorized, X_sentiment_metric):
     size = len(X_vectorized)
     # col_num = X_sentiment_metric.shape[1]
     for i in np.arange(size):
-        np.append(X_vectorized[i], X_sentiment_metric.values[i])
+        X_vectorized[i] = np.append(X_vectorized[i], X_sentiment_metric.values[i])
         """
         sentiment_metric = X_sentiment_metric.values[i]
         for col_index in np.arange(col_num):
@@ -104,15 +108,7 @@ def feature_engineering(X, doc2vec_model):
     return X_features
 
 
-def build_classifier(complaints_with_sentiment, escalate_classifier, tag, save_dir):
-
-    y = [0 if x == "No" else 1 for x in complaints_with_sentiment["Consumer disputed?"]]
-    X = complaints_with_sentiment
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
-    # scale
-    X_train, X_test = scale_features(X_train, X_test)
-
+def build_classifier(X_train, y_train, escalate_classifier, tag, save_dir):
     # under sampling
     #X_train_res, y_train_res = under_sampling(X_train, X_test)
 
@@ -129,7 +125,10 @@ def build_classifier(complaints_with_sentiment, escalate_classifier, tag, save_d
     print("Fit the classifier")
     escalate_classifier.fit(X_train, y_train)
 
-    return escalate_classifier
+    print("Save the escalate classifier...")
+    dump(escalate_classifier, open(save_dir + os.sep + "{}.joblib".format(tag), "wb"))
+
+    return escalate_classifier, doc2vec_model
 
 
 def evaluate_model(escalate_classifier, doc2vec_model, X_test, y_test, is_rf, tag):
@@ -144,23 +143,45 @@ def evaluate_model(escalate_classifier, doc2vec_model, X_test, y_test, is_rf, ta
 
 def main():
     complaints_with_sentiment = pd.read_csv("data/complaints_with_sentiment_metric.csv")
-
     complaints_with_sentiment = complaints_with_sentiment[VALIDATION_SIZE:]
 
+    X = complaints_with_sentiment.drop(columns=["dispute", "Consumer disputed?"])
+    y = [0 if x == "No" else 1 for x in complaints_with_sentiment["Consumer disputed?"]]
+
     # One hot coding for company_response category
-    complaints_with_sentiment = pd.get_dummies(complaints_with_sentiment, columns=["company_response"])
+    X = pd.get_dummies(X, columns=["company_response"])
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
+    # scale
+    X_train, X_test = scale_features(X_train, X_test)
 
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
-    model_tag = "lgrg"
-    # classifier_model = GradientBoostingClassifier(random_state=0)
-    # model_tag = "gbm"
+    #classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
+    #model_tag = "lgrg"
+    classifier_model = GradientBoostingClassifier(random_state=0)
+    model_tag = "gbm"
 
-    # Build a classifier for all category together
     tag = "doc2vec.all"
-    fpr, tpr, model_auc = build_classifier(complaints_with_sentiment, classifier_model, tag, model_save_dir)
+    # Build the doc2vec_model and escalate classifier using training data
+    escalate_classifier, doc2vec_model = build_classifier(X_train,
+                                                          y_train,
+                                                          classifier_model,
+                                                          model_tag+"_"+tag,
+                                                          model_save_dir)
+
+    # Load pre-trained doc2vec and classifier models
+    # escalate_classifier = load_model(model_save_dir + os.sep + "lgrg_doc2vec.all.joblib")
+    # doc2vec_model = load_doc2vec_model(model_save_dir + os.sep + "doc2vec_lgrg_doc2vec.all")
+
+    is_rf = False
+    fpr, tpr, model_auc = evaluate_model(escalate_classifier,
+                                         doc2vec_model,
+                                         X_test,
+                                         y_test,
+                                         is_rf,
+                                         tag)
     print("The auc score for {} is {:.3f}".format(tag, model_auc))
     title = "ROC curve for escalate classifier for " + model_tag + "." + tag
     save_file = "figs/roc_escalation_classifier_" + model_tag + "." + tag + ".png"
