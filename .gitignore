@@ -1,5 +1,8 @@
 # data files
-**/data
+data/complaints-2019-05-16_13_17.csv
+data/predicted_result_of_validation.csv
+
+**/bak
 
 .DS_Store
 
