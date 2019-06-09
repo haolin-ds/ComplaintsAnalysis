@@ -3,10 +3,11 @@ import numpy as np
 import pandas as pd
 import os
 
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from UnderSampling import under_sampling
 
-from EscalationClassifier import logistic_regression_model
+from EscalationClassifier import logistic_regression_model, model_evaluate
 from SMOTEOverSampling import smote_over_sampling
 from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
@@ -36,10 +37,25 @@ def load_doc2vec_model(model_file):
     return model
 
 
-def train_doc2vec(X_train, vector_size, min_count, epochs):
+def train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag):
+    """
+    Train the doc2vec model based on X_train and save the model.
+    :param X_train:
+    :param vector_size:
+    :param min_count:
+    :param epochs:
+    :param save_dir:
+    :param tag:
+    :return: The trained doc2vec model
+    """
     tokenized_narratives = read_narratives(X_train)
-    model = gensim.models.doc2vec.Doc2Vec(vector_size=vector_size, min_count=2, epochs=20)
+    model = gensim.models.doc2vec.Doc2Vec(vector_size=vector_size,
+                                          min_count=min_count,
+                                          epochs=epochs)
     model.build_vocab(tokenized_narratives)
+
+    print("Saving doctvec_model...")
+    dump_doc2vec_model(model, save_dir, tag)
 
     return model
 
@@ -52,47 +68,43 @@ def doc2vec_vectorize(model, tokenized_narratives):
 
 
 def combine_features(X_vectorized, X_sentiment_metric):
+    print("Combing features...")
     size = len(X_vectorized)
-    features = []
+    # col_num = X_sentiment_metric.shape[1]
     for i in np.arange(size):
-        feature = []
-        feature.append(X_vectorized[i])
-        feature.append(X_sentiment_metric.values[i])
-        features.append(feature)
-    return features
+        np.append(X_vectorized[i], X_sentiment_metric.values[i])
+        """
+        sentiment_metric = X_sentiment_metric.values[i]
+        for col_index in np.arange(col_num):
+            X_vectorized[i].append(sentiment_metric[col_index])
+        """
+
+    return X_vectorized
 
 
-def feature_engineering(X_train, X_test, save_dir, tag):
-    print("Training doc2vec_model...")
-    vector_size, min_count, epochs = 50, 2, 20
-    doc2vec_model = train_doc2vec(X_train, vector_size, min_count, epochs)
-
-    print("Saving doctvec_model...")
-    dump_doc2vec_model(doc2vec_model, save_dir, tag)
-
+def feature_engineering(X, doc2vec_model):
+    """
+    Vectorize X using pre-trained doc2vec_model, and combine sentiment metrics to
+    form features
+    :param X:
+    :param doc2vec_model:
+    :return: features ready for training(when X is X_train) or evaluating(when
+     X is X_test) classifier
+    """
     print("Vectorizing...")
-    X_train_narratives = read_narratives(X_train, True)
-    X_train_vectorized = doc2vec_vectorize(doc2vec_model, X_train_narratives)
-    print(X_train.shape)
+    X_narratives = read_narratives(X, True)
+    X_vectorized = doc2vec_vectorize(doc2vec_model, X_narratives)
+    print(X.shape)
 
-    X_test_narratives = read_narratives(X_test, True)
-    X_test_vectorized = doc2vec_vectorize(doc2vec_model, X_test_narratives)
+    X_sentiment_metric = X.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
 
+    X_features = combine_features(X_vectorized, X_sentiment_metric)
+    print(X_features[0])
 
-    X_train_sentiment_metric = X_train.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
-
-
-    X_train = combine_features(X_train_vectorized, X_train_sentiment_metric)
-    print(X_train.shape)
-
-    # X_test
-    X_test_sentiment_metric = X_test.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
-    X_test = combine_features(X_test_vectorized, X_test_sentiment_metric)
-
-    return X_train, X_test
+    return X_features
 
 
-def build_classifier(complaints_with_sentiment, classifier_model, tag, save_dir):
+def build_classifier(complaints_with_sentiment, escalate_classifier, tag, save_dir):
 
     y = [0 if x == "No" else 1 for x in complaints_with_sentiment["Consumer disputed?"]]
     X = complaints_with_sentiment
@@ -104,13 +116,28 @@ def build_classifier(complaints_with_sentiment, classifier_model, tag, save_dir)
     # under sampling
     #X_train_res, y_train_res = under_sampling(X_train, X_test)
 
-    X_train, X_test = feature_engineering(X_train, X_test, save_dir, tag)
+    print("Training doc2vec_model...")
+    vector_size, min_count, epochs = 100, 2, 20
+    doc2vec_model = train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag)
 
+    X_train = feature_engineering(X_train, doc2vec_model)
 
     # Oversampling using SMOTE
-    X_trainval_res, y_trainval_res = smote_over_sampling(X_train, y_train)
+    print("Oversampling...")
+    X_train, y_train = smote_over_sampling(X_train, y_train)
 
-    fpr, tpr, model_auc = classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
+    print("Fit the classifier")
+    escalate_classifier.fit(X_train, y_train)
+
+    return escalate_classifier
+
+
+def evaluate_model(escalate_classifier, doc2vec_model, X_test, y_test, is_rf, tag):
+    print("Vectorize and feature engineering for X_test...")
+    X_test = feature_engineering(X_test, doc2vec_model)
+
+    print("Evaluating the model...")
+    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_test, y_test, is_rf, tag)
 
     return fpr, tpr, model_auc
 
@@ -126,9 +153,9 @@ def main():
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    classifier_model = logistic_regression_model
+    classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
     model_tag = "lgrg"
-    # classifier_model = gradient_boosting_model
+    # classifier_model = GradientBoostingClassifier(random_state=0)
     # model_tag = "gbm"
 
     # Build a classifier for all category together
