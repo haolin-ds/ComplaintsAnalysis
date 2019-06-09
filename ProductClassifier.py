@@ -9,19 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from SMOTEOverSampling import smote_over_sampling
 from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
 
-from Utilities import save_model, draw_roc_curve, VALIDATION_SIZE
-
-PRODUCT_LABELS = ['Bank account or service',
-                  'Credit reporting',
-                  'Mortgage',
-                  'Debt collection',
-                  'Credit card',
-                  'Student loan',
-                  'Payday loan',
-                  'Consumer Loan',
-                  'Money transfers',
-                  'Prepaid card',
-                  'Other financial service']
+from Utilities import save_model, draw_roc_curve, VALIDATION_SIZE, PRODUCT_LABELS
 
 
 def load_tf_idf_vecterizer(model_joblib_file):

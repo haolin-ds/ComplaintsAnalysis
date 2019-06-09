@@ -67,7 +67,7 @@ def model_evaluate(model, X_test, y_test, is_rf=False, tag="all"):
     return fpr, tpr, model_auc
 
 
-def feature_engineer(X_train, X_test, tag="all"):
+def feature_engineer(X_train, X_test, save_dir, tag="all"):
     """
     For complaints_features, generate sentiment_metrics and vectorize
     processed_narratives and join them as a feature for classifier.
@@ -156,7 +156,7 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     """
 
     # Feature engineering by vectorizing and generate sentiment metrics
-    X_trainval, X_test = feature_engineer(X_trainval, X_test, tag)
+    X_trainval, X_test = feature_engineer(X_trainval, X_test, save_dir, tag)
 
     # Oversampling using SMOTE
     X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval, y_trainval)

@@ -5,6 +5,18 @@ from sklearn.preprocessing import MinMaxScaler
 
 VALIDATION_SIZE = 1000
 
+PRODUCT_LABELS = ['Bank account or service',
+                  'Credit reporting',
+                  'Mortgage',
+                  'Debt collection',
+                  'Credit card',
+                  'Student loan',
+                  'Payday loan',
+                  'Consumer Loan',
+                  'Money transfers',
+                  'Prepaid card',
+                  'Other financial service']
+
 
 def save_model(model, output_file):
     # save the model as final_model
