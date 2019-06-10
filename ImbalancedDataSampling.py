@@ -9,6 +9,7 @@ def smote_over_sampling(X_train, y_train, random_state=0):
 
     return X_train_res, y_train_res
 
+
 def under_sampling(X_train, y_train):
     sampler = RandomUnderSampler(sampling_strategy='majority',
                                  random_state=0)

@@ -7,21 +7,30 @@ from joblib import dump
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from Utilities import load_model
+from sklearn.preprocessing import MinMaxScaler
+
+from Utilities import load_model, save_model
 from UnderSampling import under_sampling
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 from EscalationClassifier import model_evaluate
-from SMOTEOverSampling import smote_over_sampling
+from ImbalancedDataSampling import smote_over_sampling
 from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
 
-def read_narratives(complaints, tokens_only=False):
+def tokenize_narratives(complaints, tokens_only=False):
+    """
+    Tokenize narratives and tag them if tokens_only=False
+    :param complaints:
+    :param tokens_only:
+    :return: tokenized narratives
+    """
     results = []
 
     for i in np.arange(len(complaints)):
         narrative = complaints["Consumer complaint narrative"].values[i]
         complaint_id = complaints["Complaint ID"].values[i]
+
         if tokens_only:
             results.append(gensim.utils.simple_preprocess(narrative))
         else:
@@ -36,6 +45,17 @@ def dump_doc2vec_model(model, save_dir, tag):
     model.save(fname)
 
 
+def build_scaler(X_train):
+    scaler = MinMaxScaler()
+    scaler.fit(X_train[:, :-4])
+
+    save_model(scaler, "trained_models/scaler.doc2vec.joblib")
+
+
+def scale(scaler, X):
+    X[:, :-4] = scaler.transform(X[:, :-4])
+
+
 def load_doc2vec_model(model_file):
     model = Doc2Vec.load(model_file)
     return model
@@ -44,17 +64,19 @@ def load_doc2vec_model(model_file):
 def train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag):
     """
     Train the doc2vec model based on X_train and save the model.
-    :param X_train:
-    :param vector_size:
+    :param X_train: data to train doc2vec model
+    :param vector_size: The size of doc2vec vector
     :param min_count:
     :param epochs:
     :param save_dir:
     :param tag:
-    :return: The trained doc2vec model
+    :return: The doc2vec model trained based on X_train
     """
-    tokenized_narratives = read_narratives(X_train)
+    tokenized_narratives = tokenize_narratives(X_train)
     model = gensim.models.doc2vec.Doc2Vec(vector_size=vector_size,
                                           min_count=min_count,
+                                          window=10,
+                                          dm=1,
                                           epochs=epochs)
     model.build_vocab(tokenized_narratives)
 
@@ -65,6 +87,12 @@ def train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag):
 
 
 def doc2vec_vectorize(model, tokenized_narratives):
+    """
+    Using pre-trained doc2vec model, vectorized complaint narratives
+    :param model: doc2vec model trained on training data
+    :param tokenized_narratives: a list of narrative tokens
+    :return: vectorized complaints
+    """
     narratives_vectorized = []
     for tokenized_narrative in tokenized_narratives:
         narratives_vectorized.append(model.infer_vector(tokenized_narrative))
@@ -72,6 +100,12 @@ def doc2vec_vectorize(model, tokenized_narratives):
 
 
 def combine_features(X_vectorized, X_sentiment_metric):
+    """
+    Combine vectorized X and sentiment_metrics as input features for escalate classifier
+    :param X_vectorized:
+    :param X_sentiment_metric:
+    :return:
+    """
     print("Combing features...")
     size = len(X_vectorized)
     # col_num = X_sentiment_metric.shape[1]
@@ -96,14 +130,15 @@ def feature_engineering(X, doc2vec_model):
      X is X_test) classifier
     """
     print("Vectorizing...")
-    X_narratives = read_narratives(X, True)
+    X_narratives = tokenize_narratives(X, True)
     X_vectorized = doc2vec_vectorize(doc2vec_model, X_narratives)
-    print(X.shape)
+
+    print(X_vectorized[0])
 
     X_sentiment_metric = X.loc[:, "corpus_score_sum":"company_response_Closed with non-monetary relief"]
 
     X_features = combine_features(X_vectorized, X_sentiment_metric)
-    print(X_features[0])
+    print(len(X_features[0]))
 
     return X_features
 
@@ -117,6 +152,12 @@ def build_classifier(X_train, y_train, escalate_classifier, tag, save_dir):
     doc2vec_model = train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag)
 
     X_train = feature_engineering(X_train, doc2vec_model)
+
+    """
+    # scale
+    scaler = build_scaler(X_train)
+    X_train = scale(scaler, X_train)
+    """
 
     # Oversampling using SMOTE
     print("Oversampling...")
@@ -135,6 +176,11 @@ def evaluate_model(escalate_classifier, doc2vec_model, X_test, y_test, is_rf, ta
     print("Vectorize and feature engineering for X_test...")
     X_test = feature_engineering(X_test, doc2vec_model)
 
+    """
+    # scale
+    X_test = scale(scaler, X_test)
+    """
+
     print("Evaluating the model...")
     fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_test, y_test, is_rf, tag)
 
@@ -145,23 +191,21 @@ def main():
     complaints_with_sentiment = pd.read_csv("data/complaints_with_sentiment_metric.csv")
     complaints_with_sentiment = complaints_with_sentiment[VALIDATION_SIZE:]
 
-    X = complaints_with_sentiment.drop(columns=["dispute", "Consumer disputed?"])
+    X = complaints_with_sentiment.drop(columns=["dispute"])
     y = [0 if x == "No" else 1 for x in complaints_with_sentiment["Consumer disputed?"]]
 
     # One hot coding for company_response category
     X = pd.get_dummies(X, columns=["company_response"])
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
-    # scale
-    X_train, X_test = scale_features(X_train, X_test)
 
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    #classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
-    #model_tag = "lgrg"
-    classifier_model = GradientBoostingClassifier(random_state=0)
-    model_tag = "gbm"
+    classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
+    model_tag = "lgrg"
+    # classifier_model = GradientBoostingClassifier(random_state=0)
+    # model_tag = "gbm"
 
     tag = "doc2vec.all"
     # Build the doc2vec_model and escalate classifier using training data
@@ -187,4 +231,4 @@ def main():
     save_file = "figs/roc_escalation_classifier_" + model_tag + "." + tag + ".png"
     draw_roc_curve(title, save_file, [fpr], [tpr], [model_auc], [model_tag])
 
-main()
+#main()

@@ -100,11 +100,12 @@ def predict_escalation(clf_escalation, narrative_vectorized, sentiment_metric):
     data["Company Response"] = response_types
     data["Probability of Escalation"] = predict_probability_list
 
+    escalation_prob_thresh = 0.5
 
-    plt.figure(figsize=(5, 8))
+    plt.figure(figsize=(5, 5))
     barlist = plt.bar(response_types, predict_probability_list, alpha=0.8)
     for i in np.arange(len(predict_probability_list)):
-        if predict_probability_list[i] >= 0.5:
+        if predict_probability_list[i] >= escalation_prob_thresh:
             barlist[i].set_color('r')
 
     plt.ylabel('Probability of Escalation', fontsize=12)
@@ -112,8 +113,9 @@ def predict_escalation(clf_escalation, narrative_vectorized, sentiment_metric):
     plt.xticks(rotation=45)
     plt.yticks(np.arange(0, 1.1, step=0.1))
     plt.gcf().subplots_adjust(bottom=0.35)
-    plt.show()
+    #plt.show()
     plt.savefig(escalation_prob_fig, bbox_inches='tight')
+    plt.close()
 
     """
     data.plot.bar()
@@ -125,8 +127,20 @@ def predict_escalation(clf_escalation, narrative_vectorized, sentiment_metric):
     plt.gcf().subplots_adjust(bottom=0.4)
     plt.savefig(escalation_prob_fig)
     """
-    # Suggest the response type to be the one with minimum probability to escalate
-    suggested_response = response_types[predict_probability_list.index(min(predict_probability_list))]
+    # Suggest the response type not to be the one with minimum probability to escalate,
+    # because money-relief will always be the one with lowest probabilty. However, money
+    # relief need cost. Current criteria is to pick the one with max prob but lower than
+    # a given threshold
+    suggested_prob_thresh = escalation_prob_thresh - 0.15
+    min_prob = min(predict_probability_list)
+    suggested_index = predict_probability_list.index(min(predict_probability_list))
+    for index in np.arange(len(predict_probability_list)):
+        if (predict_probability_list[index] < suggested_prob_thresh) & \
+                (predict_probability_list[index] > min_prob):
+            min_prob = predict_probability_list[index]
+            suggested_index = index
+
+    suggested_response = response_types[suggested_index]
 
     return escalation_prob_fig, suggested_response, predict_probability_list
 
@@ -145,6 +159,7 @@ def main():
 
     print("Predicting...")
     narrative = "I have a complaint regarding the overdraft fees that were billed to my checking account. I have a complaint regarding the overdraft fees that were billed to mychecking account. I was charged XXXX overcharge fees for XXXX withdrawals in which I had funds in the account. I contact your office and spoke with a representativewho credited me with XXXX of the fees back. However, the XXXX fee was never credited. I just do n't understand how I can billed for an overdraft fee when the fundswere in my accounts. I contacted the office of the president for Flagstar Bank and my compliant was pushed aside. Flagstar has now filed a writ of garnishmentwith my employer."
+    narrative = "This file has been relisted on my credit report with a date of 2015. It 's a old file which should n't have been there in the first place. I signed up for XXXX a few years ago for {$19.00} a month. They started charging me almost {$50.00} a month without any notice. By the time I realized, the bill was high, and I had to cancel service. It has been through a few collection companies, but it is not from this year. The way it 's listed pulled down my score, and I 've been paying my current bills on time to raise my score."
     product_type, escalation_prob_fig, \
         suggest_response, escalation_probas_according_response = predict(narrative,
                                                                   clf_product,
@@ -155,4 +170,4 @@ def main():
     print("Suggested response type is " + suggest_response)
     print(escalation_probas_according_response)
 
-main()
+#main()

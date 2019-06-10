@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import label_binarize
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.linear_model import LogisticRegression
-from SMOTEOverSampling import smote_over_sampling
+from ImbalancedDataSampling import smote_over_sampling
 from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
 
 from Utilities import save_model, draw_roc_curve, VALIDATION_SIZE, PRODUCT_LABELS

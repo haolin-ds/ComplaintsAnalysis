@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from scipy.sparse import hstack
 from scipy import interp
 
-from SMOTEOverSampling import smote_over_sampling, under_sampling
+from ImbalancedDataSampling import smote_over_sampling, under_sampling
 from TextPreprocess import tf_idf_vectorize, dump_tf_idf_model
 from Utilities import scale_features, draw_roc_curve, VALIDATION_SIZE
 
