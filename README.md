@@ -26,7 +26,7 @@ narrative, it contains the complaint narrative, product category it is about, ho
 company response and what is the dispute result.  
 
 ### Flowchart
-![](figs/Model_Flowchart.png)
+![Project Flowchart](https://drive.google.com/open?id=1kh2k52byWPhQp1bJTSKfeyg5_O_TC4Ib)
 
 ### Main contents in this repository
 - Complaint_Assistant_Demo.pdf
