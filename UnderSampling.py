@@ -9,7 +9,7 @@ from scipy import interp
 from sklearn.model_selection import StratifiedKFold
 
 from EscalationClassifier import merge_narrative_processed_and_sentiment_metrics
-from SMOTEOverSampling import smote_over_sampling
+from ImbalancedDataSampling import smote_over_sampling
 from Utilities import VALIDATION_SIZE
 
 
