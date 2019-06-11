@@ -10,7 +10,7 @@ Except for these extreme case, complaint escalation might make
 you company lose your customer or ruin your reputation.   
 
 ## Solution
-[Complaint Assistant](http:/complaintassistant.best) is web app leveraged by machine learning and NLP techniques
+[Complaint Assistant](http://complaintassistant.best) is web app leveraged by machine learning and NLP techniques
  that use historical customer complaint data to predict complaint escalation and 
 suggest better response type.  Given a complaint narrative, **Complaint Assistant**
 will give the probability of escalation given different response type.  A response
@@ -19,6 +19,9 @@ type with lowest escalation chance will be recommended.
 This repository is more related to model built and result analysis. The contents 
 of web app built using Flask are in repository https://github.com/atuSpirit/ComplaintAssistantApp
 
+## Website
+[http://complaintassistant.best](http://complaintassistant.best)
+
 ### Data
 The data I use is a historical consumer complaints database on US government website.
 It contains more than 16k consumer complaints with narratives and labels.  For each
@@ -26,7 +29,8 @@ narrative, it contains the complaint narrative, product category it is about, ho
 company response and what is the dispute result.  
 
 ### Flowchart
-![Project Flowchart](https://drive.google.com/open?id=1muG2laCv7fMkkzaJr8sOozFh_teg6cRl)
+![Project Flowchart](figs/ModelFlowChart.png)
+
 
 Complaint_Assistant_Demo.pdf contains detailed explanation.
 
