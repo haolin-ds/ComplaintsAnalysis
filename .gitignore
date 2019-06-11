@@ -9,7 +9,6 @@
 **/__pycache__
 **/results
 **/trained_models
-**/figs
 **/.idea
 
 .idea/ComplaintsAnalysis.iml
