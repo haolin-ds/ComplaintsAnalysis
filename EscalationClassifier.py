@@ -188,16 +188,17 @@ def main():
     #classifier_model = gradient_boosting_model
     #model_tag = "gbm"
 
-    """
+
     # Build a classifier for all category together
-    tag = "all.L1"
+    #tag = "all.L1"
+    tag = "all"
     fpr, tpr, model_auc = build_classifier(complaints_features, classifier_model, tag, model_save_dir)
     title = "ROC curve for escalate classifier for " + model_tag
     save_file = "figs/roc_escalation_classifier_" + model_tag + ".png"
     draw_roc_curve(title, save_file, [fpr], [tpr], [model_auc], [model_tag])
+
+
     """
-
-
     # For each product category, build the classifier
     fpr_list = []
     tpr_list = []
@@ -225,4 +226,5 @@ def main():
     save_file = "figs/roc_escalation_classifier_separate_by_product_" + model_tag + ".png"
     draw_roc_curve(title, save_file, fpr_list, tpr_list, model_auc_list, tag_list)
 
+    """
 main()
