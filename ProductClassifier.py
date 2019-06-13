@@ -103,7 +103,8 @@ def multi_classifier(X, y, classifier, product_labels_name, use_SMOTE):
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
     print("average AUC score: ", roc_auc["micro"])
 
-    title = "ROC Curve of multi-class classification of different Product categories"
+    #title = "ROC Curve of multi-class classification of different Product categories"
+    title = "ROC Curve of Product classifier AUC={:.3f}".format(roc_auc["micro"])
     save_file = "figs/ROC_Curve_Product.png"
     draw_micro = True
     draw_roc_curve(title, save_file, fpr, tpr, roc_auc, product_labels_name, True)

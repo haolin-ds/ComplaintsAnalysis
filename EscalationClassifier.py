@@ -83,6 +83,8 @@ def feature_engineer(X_train, X_test, save_dir, tag="all"):
 
     print("Tf-idf vectorizing...")
     #print(X_train["processed_narrative"].head())
+    # tf_idf_vectorizer, X_train_narratives_vectorized, max_feature_num = tf_idf_vectorize(
+        # X_train["processed_narrative"])
     tf_idf_vectorizer, X_train_narratives_vectorized, max_feature_num = tf_idf_vectorize(
         X_train["processed_narrative"])
 
@@ -90,6 +92,7 @@ def feature_engineer(X_train, X_test, save_dir, tag="all"):
 
     print("Saving Tf-idf model")
     save_dir = "trained_models"
+
     dump_tf_idf_model(tf_idf_vectorizer, max_feature_num, save_dir, tag)
 
     X_train = hstack((X_train_narratives_vectorized, np.array(X_train_sentiment_metric)))
@@ -103,8 +106,8 @@ def feature_engineer(X_train, X_test, save_dir, tag="all"):
 
 
 def logistic_regression_model(X_train, X_test, y_train, y_test, tag, save_dir):
-    lgreg = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
-    #lgreg = LogisticRegression(C=1, penalty="l1", max_iter=2000)
+    #lgreg = LogisticRegression(C=0.1, solver="lbfgs", max_iter=2000)
+    lgreg = LogisticRegression(C=1, penalty="l1", max_iter=2000)
     lgreg.fit(X_train, y_train)
 
     is_rf = False
@@ -114,7 +117,7 @@ def logistic_regression_model(X_train, X_test, y_train, y_test, tag, save_dir):
     # save the model
     dump(lgreg, open(save_dir + "/lgreg.{}.joblib".format(tag), "wb"))
 
-    return fpr, tpr, model_auc
+    return fpr, tpr, model_auc, lgreg
 
 
 def gradient_boosting_model(X_train, X_test, y_train, y_test, tag, save_dir):
@@ -164,8 +167,12 @@ def build_classifier(complaints_features, classifier_model, tag, save_dir):
     # Oversampling using SMOTE
     X_trainval_res, y_trainval_res = smote_over_sampling(X_trainval, y_trainval)
 
-    fpr, tpr, model_auc = classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
 
+    fpr, tpr, model_auc, lreg = classifier_model(X_trainval_res, X_test, y_trainval_res, y_test, tag, save_dir)
+
+    # Model evaluation on X_train, y_train
+    print("Performance on training data")
+    model_evaluate(lreg, X_trainval, y_trainval, is_rf=False, tag="train")
     return fpr, tpr, model_auc
 
 
@@ -183,17 +190,17 @@ def main():
 
     # The classifier model to run
     classifier_model = logistic_regression_model
-    #model_tag = "lgrg.L1"
-    model_tag = "lgrg"
+    model_tag = "lgrg.L1.C1"
+    #model_tag = "lgrg"
     #classifier_model = gradient_boosting_model
     #model_tag = "gbm"
 
 
     # Build a classifier for all category together
     #tag = "all.L1"
-    tag = "all"
+    tag = "all.L1.C1"
     fpr, tpr, model_auc = build_classifier(complaints_features, classifier_model, tag, model_save_dir)
-    title = "ROC curve for escalate classifier for " + model_tag
+    title = "ROC curve for escalate classifier (AUC={:.3f})".format(model_auc)
     save_file = "figs/roc_escalation_classifier_" + model_tag + ".png"
     draw_roc_curve(title, save_file, [fpr], [tpr], [model_auc], [model_tag])
 
@@ -227,4 +234,4 @@ def main():
     draw_roc_curve(title, save_file, fpr_list, tpr_list, model_auc_list, tag_list)
 
     """
-main()
+#main()

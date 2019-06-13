@@ -48,7 +48,7 @@ def validate():
     clf_product_file = model_dir + "/" + "product_classifier_lgreg.sav"
     clf_escalation_file = model_dir + "/" + "lgreg.all.joblib"
     tf_idf_vectorizer_file = model_dir + "/" + "tfidf_vectorizer_max50000.all.joblib"
-    scaler_file = model_dir + "/" + "scaler.pickle"
+    scaler_file = model_dir + "/" + "scaler.joblib"
     clf_product, clf_escalation, tf_idf_vectorizer, scaler = load_models(clf_product_file,
                                                                          clf_escalation_file,
                                                                          tf_idf_vectorizer_file,

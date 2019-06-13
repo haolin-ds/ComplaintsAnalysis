@@ -79,7 +79,7 @@ def draw_roc_curve(title, save_file, fpr_list, tpr_list, roc_auc_list, label_nam
     :return:
     """
     # Plot all ROC curves
-    plt.figure(figsize=(9, 8))
+    plt.figure(figsize=(7, 6))
 
     n_classes = len(label_name_list)
 
@@ -89,7 +89,7 @@ def draw_roc_curve(title, save_file, fpr_list, tpr_list, roc_auc_list, label_nam
 
     for i, color in zip(range(n_classes), colors):
         plt.plot(fpr_list[i], tpr_list[i], color=color, lw = lw,
-                 label='{0} (area = {1:0.2f})'
+                 label='{0} (AUC = {1:0.2f})'
                        ''.format(label_name_list[i], roc_auc_list[i]))
 
     if draw_micro:
@@ -102,9 +102,9 @@ def draw_roc_curve(title, save_file, fpr_list, tpr_list, roc_auc_list, label_nam
 
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title(title)
+    plt.xlabel('False Positive Rate', fontsize=18)
+    plt.ylabel('True Positive Rate', fontsize=18)
+    plt.title(title, fontsize=20)
     plt.legend(loc="lower right")
     #plt.show()
     plt.savefig(save_file)

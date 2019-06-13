@@ -148,7 +148,7 @@ def build_classifier(X_train, y_train, escalate_classifier, tag, save_dir):
     #X_train_res, y_train_res = under_sampling(X_train, X_test)
 
     print("Training doc2vec_model...")
-    vector_size, min_count, epochs = 100, 2, 20
+    vector_size, min_count, epochs = 300, 2, 20
     doc2vec_model = train_doc2vec(X_train, vector_size, min_count, epochs, save_dir, tag)
 
     X_train = feature_engineering(X_train, doc2vec_model)
@@ -165,6 +165,9 @@ def build_classifier(X_train, y_train, escalate_classifier, tag, save_dir):
 
     print("Fit the classifier")
     escalate_classifier.fit(X_train, y_train)
+
+    # evaluating on training data
+    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_train, y_train, False, tag)
 
     print("Save the escalate classifier...")
     dump(escalate_classifier, open(save_dir + os.sep + "{}.joblib".format(tag), "wb"))
@@ -202,7 +205,7 @@ def main():
     model_save_dir = "trained_models"
 
     # The classifier model to run
-    classifier_model = LogisticRegression(C=1, solver="lbfgs", max_iter=2000)
+    classifier_model = LogisticRegression(C=100, solver="lbfgs", max_iter=2000)
     model_tag = "lgrg"
     # classifier_model = GradientBoostingClassifier(random_state=0)
     # model_tag = "gbm"
@@ -231,4 +234,4 @@ def main():
     save_file = "figs/roc_escalation_classifier_" + model_tag + "." + tag + ".png"
     draw_roc_curve(title, save_file, [fpr], [tpr], [model_auc], [model_tag])
 
-#main()
+main()
