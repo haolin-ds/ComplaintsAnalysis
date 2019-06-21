@@ -24,7 +24,7 @@ of web app built using Flask are in repository https://github.com/atuSpirit/Comp
 
 ### Data
 The data I use is a historical consumer complaints database on US government website.
-It contains more than 16k consumer complaints with narratives and labels.  For each
+It contains more than 160k consumer complaints with narratives and labels.  For each
 narrative, it contains the complaint narrative, product category it is about, how the
 company response and what is the dispute result.  
 
