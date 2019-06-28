@@ -19,6 +19,8 @@ type with lowest escalation chance will be recommended.
 This repository is more related to model built and result analysis. The contents 
 of web app built using Flask are in repository https://github.com/atuSpirit/ComplaintAssistantApp
 
+The up-to-date presentation slides of this project is [here](https://docs.google.com/presentation/d/1szLrgJknFGfscOqPvCZzJ20DIQuZvPTD_omugdjrqSE/edit?usp=sharing)
+
 ## Website
 [http://complaintassistant.best](http://complaintassistant.best)
 
