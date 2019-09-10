@@ -28,7 +28,32 @@ The up-to-date presentation slides of this project is [here](https://docs.google
 The data I use is a historical consumer complaints database on US government website.
 It contains more than 160k consumer complaints with narratives and labels.  For each
 narrative, it contains the complaint narrative, product category it is about, how the
-company response and what is the dispute result.  
+company response and what is the dispute result. 
+
+#### Explorative Data Analysis
+The data set contains customer complaints about financial produce and services. The 
+number of complaints and the number of escalated complaints are summarized in the following
+chart:
+![](figs/complaints_each_Product_category.png)
+
+**Debt collection**, **Credit reporting** and **Mortgage** are the top 3 products with 
+most number of complaints in this data set.
+
+Let's first take a look at which companies have the most complaint. 
+![](figs/top20_company.png)
+
+But wait, some companies have more complaints just because they are bigger and providing more 
+services than others. So we should also aim at the ratio of the complaints resulted in dispute.
+![](figs/dispute_ratio_of_top20_company.png) 
+
+I noticed the company "Experian Information Solutions Inc".  It has the second most number of 
+complaints, but its escalation ratio is the lowest among these 20 companies containing most 
+complaints. Every company receives complaints, what is important is how you deal with these 
+complaints. 
+
+So I build a system to predict the probability of customer complaint escalation when the companies
+adopt different responses. 
+
 
 ### Flowchart
 ![Project Flowchart](figs/ModelFlowChart.png)
@@ -76,7 +101,7 @@ Complaint_Assistant_Demo.pdf contains detailed explanation.
 
 - Validation on 1,000 mostly submitted complaints.
 
-    Half of the escalations are detected. Almost all of them have a suggested
+More than 60% of the escalations are detected. Almost all of them have a suggested
 response type different from the currently used one.  It means, 
 half of the escalations could be eliminated at the beginning!!
 
