@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from nltk.tokenize import sent_tokenize,word_tokenize
 from nltk.corpus import stopwords
@@ -33,6 +31,7 @@ def num_of_exclaimation_mark(narrative):
             num_of_exclaimationmark += 1
     return num_of_exclaimationmark
 
+
 def num_of_uppercase_word(narrative):
     words = narrative.split(" ")
     num_uppercase_word = 0
@@ -46,7 +45,7 @@ def num_of_uppercase_word(narrative):
 
 
 def transfer_label_column(label_column):
-    label_column = label_column.apply(lambda x : 1 if x == "Yes" else 0)# for x in label_column)
+    label_column = label_column.apply(lambda x : 1 if x == "Yes" else 0)
     #print(label_column)
 
     #label_column = pd.Series(np.arange(10))
@@ -55,8 +54,7 @@ def transfer_label_column(label_column):
 
 def generate_sentiment_metric(narratives):
     """
-    Generate sentiment metrics for each narrativerom narrative sentiment characteristics, say sentiment of the copus,
-        the sentence number of the corpus, word number
+    Generate sentiment metrics for each narrative.
     :param narratives: a pandas column containing complaints narratives
     :return: a dataframe whose columns are several sentiment metrics
     [corpus_score_sum, corpus_score_ave, negative_ratio, most_negative_score,
@@ -76,7 +74,6 @@ def generate_sentiment_metric(narratives):
 
     """Initialize Vader sentiment analyzer"""
     analyser = SentimentIntensityAnalyzer()
-    stop_words = set(stopwords.words('english'))
 
     X = pd.DataFrame()
 
@@ -157,12 +154,14 @@ def form_feature_data(complaints):
 def dump_feature_to_csv(data, output_file):
     data.to_csv(output_file, index=False)
 
+
 def get_complaints_with_sentiment(complaints, sentiment_metrics):
     complaints_with_sentiment = pd.merge(complaints.reset_index(drop=True),
                                    sentiment_metrics.reset_index(drop=True),
                                    how='inner',
                                    on=['Complaint ID', 'Complaint ID'])
     return complaints_with_sentiment
+
 
 def main():
     complaints_file = "data/complaints-2019-05-16_13_17.clean.csv"

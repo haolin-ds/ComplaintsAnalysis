@@ -2,6 +2,7 @@ import pandas as pd
 
 
 def clean_data():
+    """Keep complaint data with meaningful labels."""
     complaints = pd.read_csv("data/complaints-2019-05-16_13_17.csv")
 
     # Remove data with no dispute label

@@ -167,7 +167,7 @@ def build_classifier(X_train, y_train, escalate_classifier, tag, save_dir):
     escalate_classifier.fit(X_train, y_train)
 
     # evaluating on training data
-    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_train, y_train, False, tag)
+    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_train, y_train, False)
 
     print("Save the escalate classifier...")
     dump(escalate_classifier, open(save_dir + os.sep + "{}.joblib".format(tag), "wb"))
@@ -185,7 +185,7 @@ def evaluate_model(escalate_classifier, doc2vec_model, X_test, y_test, is_rf, ta
     """
 
     print("Evaluating the model...")
-    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_test, y_test, is_rf, tag)
+    fpr, tpr, model_auc = model_evaluate(escalate_classifier, X_test, y_test, is_rf)
 
     return fpr, tpr, model_auc
 

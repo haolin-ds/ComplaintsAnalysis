@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import hstack
 
 from SentimentMetricGenerator import generate_sentiment_metric
-from TextPreprocess import pre_process_narrative
+from TextPreprocess import pre_process_one_narrative
 from Utilities import load_models, get_response_types
 from ProductClassifier import PRODUCT_LABELS
 
@@ -27,7 +27,7 @@ def predict(narrative, clf_product, clf_escalation, tf_idf_vectorizer, scaler):
     sentiment_metric.loc[:, ["word_num", "sentence_num"]] = scaler.transform(sentiment_metric.loc[:, ["word_num", "sentence_num"]])
 
     # Transfer narrative to feature vector be used by classifier
-    preprocessed_narrative = pre_process_narrative(narrative)
+    preprocessed_narrative = pre_process_one_narrative(narrative)
     narrative = " ".join(preprocessed_narrative)
 
     narrative_vectorized = tf_idf_vectorizer.transform([narrative])
