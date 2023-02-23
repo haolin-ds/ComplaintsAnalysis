@@ -7,7 +7,7 @@ American asking for 1784 billion, trillion dollars, which is more than the
 GDP of the WHOLE planet.  This ridiculous lawsuit starts just from several 
 frustrating phone calls he made to settle some incorrectly deposited checks. 
 Except for these extreme case, complaint escalation might make 
-you company lose your customer or ruin your reputation.   
+your company lose your customer or ruin your reputation.   
 
 ## Solution
 [Complaint Assistant](http://complaintassistant.best) is web app leveraged by machine learning and NLP techniques
